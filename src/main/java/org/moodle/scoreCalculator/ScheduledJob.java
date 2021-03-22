@@ -19,6 +19,7 @@ public class ScheduledJob {
     @Scheduled(fixedDelay = 20000)
     public void reportCurrentTime() {
         System.out.println("The time is -: "+ dateFormat.format(new Date()));
-        service.getQuistionaire();
+        //service.handleUserPreferences();
+        service.handleQuestionsDifficulty();
     }
 }

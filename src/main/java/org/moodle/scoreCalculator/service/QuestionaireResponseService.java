@@ -3,14 +3,23 @@ package org.moodle.scoreCalculator.service;
 import java.time.LocalDateTime;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.moodle.scoreCalculator.model.CourseModule;
+import org.moodle.scoreCalculator.model.Question;
+import org.moodle.scoreCalculator.model.QuestionAttempt;
+import org.moodle.scoreCalculator.model.QuestionCategory;
 import org.moodle.scoreCalculator.model.QuestionaireChoice;
 import org.moodle.scoreCalculator.model.QuestionaireResponseDetails;
 import org.moodle.scoreCalculator.model.UserLog;
 import org.moodle.scoreCalculator.repository.CourseModuleRepository;
+import org.moodle.scoreCalculator.repository.QuestionAttemptRepository;
+import org.moodle.scoreCalculator.repository.QuestionAttemptStepsRepository;
+import org.moodle.scoreCalculator.repository.QuestionCategoryRepository;
+import org.moodle.scoreCalculator.repository.QuestionRepository;
 import org.moodle.scoreCalculator.repository.QuestionaireChoiceRepository;
 import org.moodle.scoreCalculator.repository.QuestionaireResponseDetailsRepository;
 import org.moodle.scoreCalculator.repository.QuestionaireResponseRepository;
@@ -35,7 +44,19 @@ public class QuestionaireResponseService {
 	@Autowired
 	CourseModuleRepository courseModuleRepository;
 
-	public void getQuistionaire() {
+	@Autowired
+	QuestionAttemptRepository questionAttemptRepository;
+	
+	@Autowired
+	QuestionAttemptStepsRepository questionAttemptStepsRepository;
+	
+	@Autowired
+	QuestionRepository questionRepository;
+	
+	@Autowired
+	QuestionCategoryRepository questionCategoryRepository;
+	
+	public void handleUserPreferences() {
 		// Iterable<QuistionaireResponse> list = repo.findAll();
 		questionaireResponseRepository.findAll().forEach(questionaire -> {
 			if (questionaire.getScore1() == null) {
@@ -114,5 +135,65 @@ public class QuestionaireResponseService {
 			}
 
 		});
+	}
+	
+	public void handleQuestionsDifficulty() {
+		Map<Long,String> questionRank = new HashMap<>();
+		questionAttemptStepsRepository.findByReadflag(0).forEach(questionAttemptStep -> {
+			
+			QuestionAttempt questionAttempt = questionAttemptRepository.findById(questionAttemptStep.getQuestionattemptid()).get();
+			
+			if(!questionRank.containsKey(questionAttempt.getQuestionid()))
+				questionRank.put(questionAttempt.getQuestionid(), "0_0");
+			
+			String currQuestionRank = questionRank.get(questionAttempt.getQuestionid());
+			
+			if(questionAttemptStep.isCorrectanswer())
+				currQuestionRank = (Integer.parseInt(currQuestionRank.split("_")[0])+1) + "_" + currQuestionRank.split("_")[1];
+			else
+				currQuestionRank = currQuestionRank.split("_")[0] + "_" + (Integer.parseInt(currQuestionRank.split("_")[1])+1);
+			questionRank.replace(questionAttempt.getQuestionid(), currQuestionRank);
+			
+			questionAttemptStep.setReadflag(1);
+			questionAttemptStepsRepository.save(questionAttemptStep);
+				
+		});
+		
+		
+		for(Long questionId:questionRank.keySet()) {
+			Question currQuestion = questionRepository.findById(questionId).get();
+			QuestionCategory currQuestionCategory = questionCategoryRepository.findById(currQuestion.getCategory()).get();
+			List<QuestionCategory> questionCategories = questionCategoryRepository.findByContextid(currQuestionCategory.getContextid());
+			Long easyId=-1l,mediumId=-1l,hardId=-1l;
+			for(QuestionCategory questionCategory:questionCategories) {
+				if("Easy".equals(questionCategory.getName()))
+					easyId=questionCategory.getId();
+				else if("Medium".equals(questionCategory.getName()))
+					mediumId=questionCategory.getId();
+				else if("Hard".equals(questionCategory.getName()))
+					hardId=questionCategory.getId();
+			}
+			String currQuestionRank = questionRank.get(questionId);
+			int correctCount = Integer.parseInt(currQuestionRank.split("_")[0]);
+			int wrongCount = Integer.parseInt(currQuestionRank.split("_")[1]);
+			if(((wrongCount/(correctCount+wrongCount))*100) >= 70) {
+				if("Easy".equals(currQuestionRank)) {
+					currQuestion.setCategory(mediumId);
+				} else if("Medium".equals(currQuestionRank)) {
+					currQuestion.setCategory(hardId);
+				}
+			}
+			
+			if(((correctCount/(correctCount+wrongCount))*100) >= 70) {
+				if("Medium".equals(currQuestionRank)) {
+					currQuestion.setCategory(easyId);
+				} else if("Hard".equals(currQuestionRank)) {
+					currQuestion.setCategory(mediumId);
+				}
+			}
+			
+			questionRepository.save(currQuestion);
+		}
+		
 	}
 }
