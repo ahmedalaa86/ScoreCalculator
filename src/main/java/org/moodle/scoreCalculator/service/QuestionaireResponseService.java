@@ -14,6 +14,7 @@ import org.moodle.scoreCalculator.model.QuestionAttempt;
 import org.moodle.scoreCalculator.model.QuestionCategory;
 import org.moodle.scoreCalculator.model.QuestionaireChoice;
 import org.moodle.scoreCalculator.model.QuestionaireResponseDetails;
+import org.moodle.scoreCalculator.model.QuestionsLog;
 import org.moodle.scoreCalculator.model.UserLog;
 import org.moodle.scoreCalculator.repository.CourseModuleRepository;
 import org.moodle.scoreCalculator.repository.QuestionAttemptRepository;
@@ -23,8 +24,10 @@ import org.moodle.scoreCalculator.repository.QuestionRepository;
 import org.moodle.scoreCalculator.repository.QuestionaireChoiceRepository;
 import org.moodle.scoreCalculator.repository.QuestionaireResponseDetailsRepository;
 import org.moodle.scoreCalculator.repository.QuestionaireResponseRepository;
+import org.moodle.scoreCalculator.repository.QuestionsLogRepository;
 import org.moodle.scoreCalculator.repository.UserLogRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -55,6 +58,12 @@ public class QuestionaireResponseService {
 	
 	@Autowired
 	QuestionCategoryRepository questionCategoryRepository;
+	
+	@Autowired
+	QuestionsLogRepository questionsLogRepository;
+	
+	@Value("${questions.category.threshhold}")
+	String threshold;
 	
 	public void handleUserPreferences() {
 		// Iterable<QuistionaireResponse> list = repo.findAll();
@@ -139,6 +148,18 @@ public class QuestionaireResponseService {
 	
 	public void handleQuestionsDifficulty() {
 		Map<Long,String> questionRank = new HashMap<>();
+		QuestionsLog log = new QuestionsLog();
+		boolean categoryChanged = false;
+		
+		int intThreshold = 70;
+		
+		try {
+			intThreshold = Integer.parseInt(threshold);
+		}
+		catch(Exception ex) {
+			
+		}
+		
 		questionAttemptStepsRepository.findByReadflag(0).forEach(questionAttemptStep -> {
 			
 			QuestionAttempt questionAttempt = questionAttemptRepository.findById(questionAttemptStep.getQuestionattemptid()).get();
@@ -176,22 +197,35 @@ public class QuestionaireResponseService {
 			String currQuestionRank = questionRank.get(questionId);
 			int correctCount = Integer.parseInt(currQuestionRank.split("_")[0]);
 			int wrongCount = Integer.parseInt(currQuestionRank.split("_")[1]);
-			if(((wrongCount/(correctCount+wrongCount))*100) >= 70) {
+			log.setNoOfCorrect(correctCount);
+			log.setNoOfWrong(wrongCount);
+			log.setOldCategory(currQuestion.getCategory());
+			if(((wrongCount/(correctCount+wrongCount))*100) >= intThreshold) {
 				if("Easy".equals(currQuestionRank)) {
 					currQuestion.setCategory(mediumId);
 				} else if("Medium".equals(currQuestionRank)) {
 					currQuestion.setCategory(hardId);
 				}
+				categoryChanged = true;
 			}
 			
-			if(((correctCount/(correctCount+wrongCount))*100) >= 70) {
+			log.setThreshold(intThreshold);
+			log.setQuestionId(currQuestion.getId());
+			log.setActionDate(new Date());
+			
+			if(((correctCount/(correctCount+wrongCount))*100) >= intThreshold) {
 				if("Medium".equals(currQuestionRank)) {
 					currQuestion.setCategory(easyId);
 				} else if("Hard".equals(currQuestionRank)) {
 					currQuestion.setCategory(mediumId);
 				}
+				categoryChanged = true;
 			}
 			
+			log.setNewCategory(currQuestion.getCategory());
+			
+			if(categoryChanged)
+				questionsLogRepository.save(log);
 			questionRepository.save(currQuestion);
 		}
 		
