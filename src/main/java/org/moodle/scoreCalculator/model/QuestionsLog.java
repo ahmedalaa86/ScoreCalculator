@@ -2,7 +2,10 @@ package org.moodle.scoreCalculator.model;
 
 import java.util.Date;
 
+import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
 
@@ -10,14 +13,29 @@ import javax.persistence.Table;
 @Table(name = "mdl_questions_log")
 public class QuestionsLog implements java.io.Serializable{
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	Long id;
+	
+	@Column(name="question_id")
 	Long questionId;
+	
+	@Column(name="no_of_wrong")
 	Integer noOfWrong;
+	
+	@Column(name="no_of_correct")
 	Integer noOfCorrect;
+	
+	@Column(name="old_category")
 	Long oldCategory;
+	
+	@Column(name="new_category")
 	Long newCategory;
+	
 	Integer threshold;
+	
+	@Column(name="action_date")
 	Date actionDate;
+	
 	public Long getId() {
 		return id;
 	}

@@ -197,9 +197,16 @@ public class QuestionaireResponseService {
 			String currQuestionRank = questionRank.get(questionId);
 			int correctCount = Integer.parseInt(currQuestionRank.split("_")[0]);
 			int wrongCount = Integer.parseInt(currQuestionRank.split("_")[1]);
+			log = new QuestionsLog();
 			log.setNoOfCorrect(correctCount);
 			log.setNoOfWrong(wrongCount);
 			log.setOldCategory(currQuestion.getCategory());
+			System.out.println("********************* Start ***********");
+			System.out.println(wrongCount);
+			System.out.println(correctCount);
+			System.out.println(((wrongCount/(correctCount+wrongCount))*100));
+			System.out.println(intThreshold);
+			
 			if(((wrongCount/(correctCount+wrongCount))*100) >= intThreshold) {
 				if("Easy".equals(currQuestionRank)) {
 					currQuestion.setCategory(mediumId);
@@ -208,7 +215,8 @@ public class QuestionaireResponseService {
 				}
 				categoryChanged = true;
 			}
-			
+			System.out.println(categoryChanged);
+			System.out.println("*********************  End  ***********");
 			log.setThreshold(intThreshold);
 			log.setQuestionId(currQuestion.getId());
 			log.setActionDate(new Date());
@@ -224,7 +232,7 @@ public class QuestionaireResponseService {
 			
 			log.setNewCategory(currQuestion.getCategory());
 			
-			if(categoryChanged)
+			if(categoryChanged && log.getOldCategory().longValue() != log.getNewCategory().longValue())
 				questionsLogRepository.save(log);
 			questionRepository.save(currQuestion);
 		}
