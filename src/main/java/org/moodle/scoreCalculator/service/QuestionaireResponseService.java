@@ -206,15 +206,16 @@ public class QuestionaireResponseService {
 			System.out.println(correctCount);
 			System.out.println(((wrongCount/(correctCount+wrongCount))*100));
 			System.out.println(intThreshold);
-			
+			System.out.println(easyId +" -- "+mediumId+" -- "+hardId);
 			if(((wrongCount/(correctCount+wrongCount))*100) >= intThreshold) {
-				if("Easy".equals(currQuestionRank)) {
+				if("Easy".equals(currQuestionCategory.getName())) {
 					currQuestion.setCategory(mediumId);
-				} else if("Medium".equals(currQuestionRank)) {
+				} else if("Medium".equals(currQuestionCategory.getName())) {
 					currQuestion.setCategory(hardId);
 				}
 				categoryChanged = true;
 			}
+			System.out.println(currQuestionCategory.getName());
 			System.out.println(categoryChanged);
 			System.out.println("*********************  End  ***********");
 			log.setThreshold(intThreshold);
