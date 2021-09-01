@@ -11,6 +11,7 @@ import java.util.Optional;
 import org.moodle.scoreCalculator.model.CourseModule;
 import org.moodle.scoreCalculator.model.Question;
 import org.moodle.scoreCalculator.model.QuestionAttempt;
+import org.moodle.scoreCalculator.model.QuestionAttemptSteps;
 import org.moodle.scoreCalculator.model.QuestionCategory;
 import org.moodle.scoreCalculator.model.QuestionaireChoice;
 import org.moodle.scoreCalculator.model.QuestionaireResponseDetails;
@@ -64,6 +65,9 @@ public class QuestionaireResponseService {
 	
 	@Value("${questions.category.threshhold}")
 	String threshold;
+	
+	@Value("${questions.min.attemps}")
+	String minAttemps;
 	
 	public void handleUserPreferences() {
 		// Iterable<QuistionaireResponse> list = repo.findAll();
@@ -152,91 +156,99 @@ public class QuestionaireResponseService {
 		boolean categoryChanged = false;
 		
 		int intThreshold = 70;
+		int intMinAttemps = 3;
 		
 		try {
 			intThreshold = Integer.parseInt(threshold);
+			intMinAttemps = Integer.parseInt(minAttemps);
 		}
 		catch(Exception ex) {
 			
 		}
 		
-		questionAttemptStepsRepository.findByReadflag(0).forEach(questionAttemptStep -> {
-			
-			QuestionAttempt questionAttempt = questionAttemptRepository.findById(questionAttemptStep.getQuestionattemptid()).get();
-			
-			if(!questionRank.containsKey(questionAttempt.getQuestionid()))
-				questionRank.put(questionAttempt.getQuestionid(), "0_0");
-			
-			String currQuestionRank = questionRank.get(questionAttempt.getQuestionid());
-			
-			if(questionAttemptStep.isCorrectanswer())
-				currQuestionRank = (Integer.parseInt(currQuestionRank.split("_")[0])+1) + "_" + currQuestionRank.split("_")[1];
-			else
-				currQuestionRank = currQuestionRank.split("_")[0] + "_" + (Integer.parseInt(currQuestionRank.split("_")[1])+1);
-			questionRank.replace(questionAttempt.getQuestionid(), currQuestionRank);
-			
-			questionAttemptStep.setReadflag(1);
-			questionAttemptStepsRepository.save(questionAttemptStep);
+		List<QuestionAttemptSteps> attempts = questionAttemptStepsRepository.findByReadflag(0);
+		
+		if(attempts.size() >= intMinAttemps) {
+			questionAttemptStepsRepository.findByReadflag(0).forEach(questionAttemptStep -> {
 				
-		});
-		
-		
-		for(Long questionId:questionRank.keySet()) {
-			Question currQuestion = questionRepository.findById(questionId).get();
-			QuestionCategory currQuestionCategory = questionCategoryRepository.findById(currQuestion.getCategory()).get();
-			List<QuestionCategory> questionCategories = questionCategoryRepository.findByContextid(currQuestionCategory.getContextid());
-			Long easyId=-1l,mediumId=-1l,hardId=-1l;
-			for(QuestionCategory questionCategory:questionCategories) {
-				if("Easy".equals(questionCategory.getName()))
-					easyId=questionCategory.getId();
-				else if("Medium".equals(questionCategory.getName()))
-					mediumId=questionCategory.getId();
-				else if("Hard".equals(questionCategory.getName()))
-					hardId=questionCategory.getId();
-			}
-			String currQuestionRank = questionRank.get(questionId);
-			int correctCount = Integer.parseInt(currQuestionRank.split("_")[0]);
-			int wrongCount = Integer.parseInt(currQuestionRank.split("_")[1]);
-			log = new QuestionsLog();
-			log.setNoOfCorrect(correctCount);
-			log.setNoOfWrong(wrongCount);
-			log.setOldCategory(currQuestion.getCategory());
-			System.out.println("********************* Start ***********");
-			System.out.println(wrongCount);
-			System.out.println(correctCount);
-			System.out.println(((wrongCount/(correctCount+wrongCount))*100));
-			System.out.println(intThreshold);
-			System.out.println(easyId +" -- "+mediumId+" -- "+hardId);
-			if(((wrongCount/(correctCount+wrongCount))*100) >= intThreshold) {
-				if("Easy".equals(currQuestionCategory.getName())) {
-					currQuestion.setCategory(mediumId);
-				} else if("Medium".equals(currQuestionCategory.getName())) {
-					currQuestion.setCategory(hardId);
+				QuestionAttempt questionAttempt = questionAttemptRepository.findById(questionAttemptStep.getQuestionattemptid()).get();
+				
+				if(!questionRank.containsKey(questionAttempt.getQuestionid()))
+					questionRank.put(questionAttempt.getQuestionid(), "0_0");
+				
+				String currQuestionRank = questionRank.get(questionAttempt.getQuestionid());
+				
+				if(questionAttemptStep.isCorrectanswer())
+					currQuestionRank = (Integer.parseInt(currQuestionRank.split("_")[0])+1) + "_" + currQuestionRank.split("_")[1];
+				else
+					currQuestionRank = currQuestionRank.split("_")[0] + "_" + (Integer.parseInt(currQuestionRank.split("_")[1])+1);
+				questionRank.replace(questionAttempt.getQuestionid(), currQuestionRank);
+				
+				questionAttemptStep.setReadflag(1);
+				questionAttemptStepsRepository.save(questionAttemptStep);
+					
+			});
+			
+			for(Long questionId:questionRank.keySet()) {
+				Question currQuestion = questionRepository.findById(questionId).get();
+				QuestionCategory currQuestionCategory = questionCategoryRepository.findById(currQuestion.getCategory()).get();
+				List<QuestionCategory> questionCategories = questionCategoryRepository.findByContextid(currQuestionCategory.getContextid());
+				Long easyId=-1l,mediumId=-1l,hardId=-1l;
+				for(QuestionCategory questionCategory:questionCategories) {
+					if("Easy".equals(questionCategory.getName()))
+						easyId=questionCategory.getId();
+					else if("Medium".equals(questionCategory.getName()))
+						mediumId=questionCategory.getId();
+					else if("Hard".equals(questionCategory.getName()))
+						hardId=questionCategory.getId();
 				}
-				categoryChanged = true;
-			}
-			System.out.println(currQuestionCategory.getName());
-			System.out.println(categoryChanged);
-			System.out.println("*********************  End  ***********");
-			log.setThreshold(intThreshold);
-			log.setQuestionId(currQuestion.getId());
-			log.setActionDate(new Date());
-			
-			if(((correctCount/(correctCount+wrongCount))*100) >= intThreshold) {
-				if("Medium".equals(currQuestionRank)) {
-					currQuestion.setCategory(easyId);
-				} else if("Hard".equals(currQuestionRank)) {
-					currQuestion.setCategory(mediumId);
+				String currQuestionRank = questionRank.get(questionId);
+				int correctCount = Integer.parseInt(currQuestionRank.split("_")[0]);
+				int wrongCount = Integer.parseInt(currQuestionRank.split("_")[1]);
+				log = new QuestionsLog();
+				log.setNoOfCorrect(correctCount);
+				log.setNoOfWrong(wrongCount);
+				log.setOldCategory(currQuestion.getCategory());
+				System.out.println("********************* Start ***********");
+				System.out.println(wrongCount);
+				System.out.println(correctCount);
+				System.out.println(((wrongCount/(correctCount+wrongCount))*100));
+				System.out.println(intThreshold);
+				System.out.println(easyId +" -- "+mediumId+" -- "+hardId);
+				if(((wrongCount/(correctCount+wrongCount))*100) >= intThreshold) {
+					if("Easy".equals(currQuestionCategory.getName())) {
+						currQuestion.setCategory(mediumId);
+					} else if("Medium".equals(currQuestionCategory.getName())) {
+						currQuestion.setCategory(hardId);
+					}
+					categoryChanged = true;
 				}
-				categoryChanged = true;
+				System.out.println(currQuestionCategory.getName());
+				System.out.println(categoryChanged);
+				System.out.println("*********************  End  ***********");
+				log.setThreshold(intThreshold);
+				log.setQuestionId(currQuestion.getId());
+				log.setActionDate(new Date());
+				
+				if(((correctCount/(correctCount+wrongCount))*100) >= intThreshold) {
+					if("Medium".equals(currQuestionRank)) {
+						currQuestion.setCategory(easyId);
+					} else if("Hard".equals(currQuestionRank)) {
+						currQuestion.setCategory(mediumId);
+					}
+					categoryChanged = true;
+				}
+				
+				log.setNewCategory(currQuestion.getCategory());
+				
+				if(categoryChanged && log.getOldCategory().longValue() != log.getNewCategory().longValue())
+					questionsLogRepository.save(log);
+				questionRepository.save(currQuestion);
 			}
-			
-			log.setNewCategory(currQuestion.getCategory());
-			
-			if(categoryChanged && log.getOldCategory().longValue() != log.getNewCategory().longValue())
-				questionsLogRepository.save(log);
-			questionRepository.save(currQuestion);
 		}
+		
+		
+		
 		
 	}
 }
